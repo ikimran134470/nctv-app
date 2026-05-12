@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCTB PDF Library - Offline Edition</title>
+    
+    <style>
+        :root {
+            --primary: #1e3c72;
+            --secondary: #2a5298;
+            --accent: #27ae60;
+            --bg: #f4f7f6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg);
+            color: #333;
+        }
+
+        /* অফলাইন ইন্ডিকেটর */
+        #status-bar {
+            display: none;
+            background: #e74c3c;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-size: 14px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 35px 20px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 { font-size: 26px; }
+        header p { font-size: 14px; opacity: 0.8; margin-top: 5px; }
+
+        main {
+            max-width: 1100px;
+            margin: 25px auto;
+            padding: 0 15px;
+        }
+
+        #book-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .book-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            border: 1px solid #eee;
+            transition: 0.3s;
+        }
+
+        .book-card:hover { transform: translateY(-5px); }
+
+        .book-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #eee;
+            margin-bottom: 12px;
+        }
+
+        .book-card h3 { font-size: 17px; margin-bottom: 10px; color: #2c3e50; height: 45px; overflow: hidden; }
+
+        .btn-read {
+            display: block;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .loader {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status-bar">⚠️ অফলাইন মোড: আগে লোড হওয়া বইগুলো দেখা যাচ্ছে।</div>
+
+    <header>
+        <h1>NCTB ই-বুক লাইব্রেরি</h1>
+        <p>সপ্তম শ্রেণির পাঠ্যবইসমূহ</p>
+    </header>
+
+    <main>
+        <div id="book-container">
+            <div class="loader">বইগুলো লোড হচ্ছে...</div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+        import { 
+            initializeFirestore, 
+            persistentLocalCache, 
+            persistentMultipleTabManager,
+            collection, 
+            getDocs 
+        } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBaK07m5gbNvHiJcSNySLouXM7ZmGcCfRM",
+            authDomain: "study-report-8a56f.firebaseapp.com",
+            projectId: "study-report-8a56f",
+            storageBucket: "study-report-8a56f.firebasestorage.app",
+            messagingSenderId: "704040672241",
+            appId: "1:704040672241:web:5771d8061de5fbd6048250",
+            measurementId: "G-WPJG9WEKRN"
+        };
+
+        // ফায়ারবেস ইনিশিয়ালাইজেশন
+        const app = initializeApp(firebaseConfig);
+
+        // ১. আধুনিক অফলাইন ক্যাশ সেটআপ (SDK v12 নিয়ম অনুযায়ী)
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager()
+            })
+        });
+
+        const container = document.getElementById('book-container');
+
+        // ২. ডাটা ফেচ করার ফাংশন
+        async function loadBooks() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "nctb_books"));
+                container.innerHTML = "";
+
+                if (querySnapshot.empty) {
+                    container.innerHTML = "<p class='loader'>কোনো বই পাওয়া যায়নি। Firestore ডাটা চেক করো।</p>";
+                    return;
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    container.innerHTML += `
+                        <div class="book-card">
+                            <img src="${data.image_url || 'https://via.placeholder.com/150x200'}" alt="Book Cover">
+                            <h3>${data.book_name || 'বইয়ের নাম'}</h3>
+                            <a href="${data.pdf_url}" target="_blank" class="btn-read">PDF পড়ুন</a>
+                        </div>`;
+                });
+            } catch (err) {
+                console.log("Error loading books:", err);
+                container.innerHTML = "<p class='loader'>ডাটা লোড করা সম্ভব হয়নি।</p>";
+            }
+        }
+
+        loadBooks();
+
+        // ৩. অফলাইন/অনলাইন নোটিশ ম্যানেজমেন্ট
+        if (!navigator.onLine) document.getElementById('status-bar').style.display = 'block';
+        
+        window.addEventListener('online', () => {
+            document.getElementById('status-bar').style.display = 'none';
+            loadBooks();
+        });
+        window.addEventListener('offline', () => {
+            document.getElementById('status-bar').style.display = 'block';
+        });
+
+        // ৪. ইনলাইন Service Worker (যাতে আলাদা sw.js ফাইল না লাগে)
+        const swSource = `
+            const version = 'v5';
+            self.addEventListener('install', e => {
+                e.waitUntil(caches.open(version).then(c => c.addAll(['./'])));
+            });
+            self.addEventListener('fetch', e => {
+                e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+            });
+        `;
+
+        const swBlob = new Blob([swSource], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(swUrl)
+                .then(() => console.log("Offline Persistence Active!"))
+                .catch(err => console.error("SW Error:", err));
+            });
+        }
+    </script>
+</body>
+</html>
