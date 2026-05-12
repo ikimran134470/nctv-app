@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCTB App - Admin Panel</title>
+    <style>
+        :root { --primary: #1e3c72; --accent: #27ae60; --error: #e74c3c; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .admin-box { width: 100%; max-width: 450px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 25px; font-size: 22px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 5px rgba(30, 60, 114, 0.2); }
+        button { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        button:hover { background: #152d56; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .msg { text-align: center; margin-bottom: 15px; font-size: 14px; padding: 10px; border-radius: 5px; display: none; }
+        .success { background: #d4edda; color: #155724; display: block; }
+        .error { background: #f8d7da; color: #721c24; display: block; }
+        #logout-btn { background: var(--error); margin-top: 15px; font-size: 14px; padding: 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- লগইন বক্স -->
+    <div class="admin-box" id="login-section">
+        <h2>এডমিন প্যানেল লগইন</h2>
+        <input type="password" id="pass-field" placeholder="পাসওয়ার্ড লিখুন">
+        <button onclick="checkPass()">লগইন করুন</button>
+    </div>
+
+    <!-- বই আপলোড বক্স -->
+    <div class="admin-box" id="admin-section" style="display: none;">
+        <h2>নতুন বই যোগ করুন</h2>
+        <div id="status-msg" class="msg"></div>
+        
+        <input type="text" id="bookName" placeholder="বইয়ের নাম (উদা: বাংলা সাহিত্য)">
+        <input type="text" id="className" placeholder="শ্রেণি (উদা: সপ্তম শ্রেণি)">
+        <input type="text" id="imgUrl" placeholder="বইয়ের কভার ছবির লিঙ্ক (Image URL)">
+        <input type="text" id="pdfUrl" placeholder="PDF ডাউনলোড লিঙ্ক (Direct URL)">
+        
+        <button id="submit-btn">Firestore-এ ডাটা পাঠান</button>
+        <button id="logout-btn" onclick="location.reload()">লগআউট</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+        // তোমার ফায়ারবেস তথ্য
+        const firebaseConfig = {
+            apiKey: "AIzaSyBaK07m5gbNvHiJcSNySLouXM7ZmGcCfRM",
+            authDomain: "study-report-8a56f.firebaseapp.com",
+            projectId: "study-report-8a56f",
+            storageBucket: "study-report-8a56f.firebasestorage.app",
+            messagingSenderId: "704040672241",
+            appId: "1:704040672241:web:5771d8061de5fbd6048250",
+            measurementId: "G-WPJG9WEKRN"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // লগইন ফাংশন
+        window.checkPass = function() {
+            const pass = document.getElementById('pass-field').value;
+            if(pass === "1234") { // পাসওয়ার্ড পরিবর্তন করতে পারো
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('admin-section').style.display = 'block';
+            } else {
+                alert("ভুল পাসওয়ার্ড! আবার চেষ্টা করো।");
+            }
+        };
+
+        // ডাটা পাঠানোর ফাংশন
+        document.getElementById('submit-btn').onclick = async () => {
+            const name = document.getElementById('bookName').value.trim();
+            const cls = document.getElementById('className').value.trim();
+            const img = document.getElementById('imgUrl').value.trim();
+            const pdf = document.getElementById('pdfUrl').value.trim();
+            const msgBox = document.getElementById('status-msg');
+            const btn = document.getElementById('submit-btn');
+
+            if(!name || !pdf) {
+                showMsg("বইয়ের নাম এবং PDF লিঙ্ক প্রয়োজন!", "error");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "ডাটা পাঠানো হচ্ছে...";
+
+            try {
+                // nctb_books কালেকশনে ডাটা অ্যাড করা
+                await addDoc(collection(db, "nctb_books"), {
+                    book_name: name,
+                    class_name: cls,
+                    image_url: img,
+                    pdf_url: pdf,
+                    created_at: serverTimestamp()
+                });
+
+                showMsg("✅ বই সফলভাবে যোগ করা হয়েছে!", "success");
+                // ইনপুট ক্লিয়ার করা
+                document.querySelectorAll('input:not([type="password"])').forEach(i => i.value = "");
+            } catch (error) {
+                console.error("Firestore Error:", error);
+                showMsg("ভুল হয়েছে: " + error.message, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Firestore-এ ডাটা পাঠান";
+            }
+        };
+
+        function showMsg(text, type) {
+            const msgBox = document.getElementById('status-msg');
+            msgBox.innerText = text;
+            msgBox.className = "msg " + type;
+            msgBox.style.display = "block";
+            setTimeout(() => { msgBox.style.display = "none"; }, 5000);
+        }
+    </script>
+</body>
+</html>
