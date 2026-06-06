@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>দণ্ডবিধি MCQ অ্যাপ (AI Powered)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 16px;
+            font-weight: bold;
+            border: 1px solid #bdc3c7;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: white;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background-color: #f0f3f4;
+        }
+        .chapter-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+        }
+        .chapter-btn:hover {
+            background-color: #2980b9;
+        }
+        .quiz-screen, .loading, .error {
+            display: none;
+        }
+        .question-box {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            border-left: 5px solid #3498db;
+        }
+        .correct {
+            background-color: #2ecc71 !important;
+            color: white;
+            border-color: #27ae60;
+        }
+        .wrong {
+            background-color: #e74c3c !important;
+            color: white;
+            border-color: #c0392b;
+        }
+        .next-btn {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            margin-top: 20px;
+        }
+        .next-btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .back-btn {
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="home-screen">
+        <h2>দণ্ডবিধি MCQ প্র্যাকটিস</h2>
+        <p style="text-align: center; color: #7f8c8d;">একটি অধ্যায় নির্বাচন করুন:</p>
+        <button class="btn chapter-btn" onclick="startQuiz(1, '১ম অধ্যায় (প্রারম্ভিক)')">১ম অধ্যায় (প্রারম্ভিক)</button>
+        <button class="btn chapter-btn" onclick="startQuiz(2, '২য় অধ্যায় (সাধারণ ব্যাখ্যা)')">২য় অধ্যায় (সাধারণ ব্যাখ্যা)</button>
+        <button class="btn chapter-btn" onclick="startQuiz(3, '৩য় অধ্যায় (শাস্তি প্রসঙ্গে)')">৩য় অধ্যায় (শাস্তি প্রসঙ্গে)</button>
+    </div>
+
+    <div id="loading-screen" class="loading">
+        <h2>AI প্রশ্ন তৈরি করছে...</h2>
+        <div class="loader"></div>
+    </div>
+
+    <div id="error-screen" class="error">
+        <h3 style="color: red; text-align: center;">দুঃখিত! প্রশ্ন লোড করা যায়নি।</h3>
+        <p id="error-message" style="text-align: center;"></p>
+        <button class="btn chapter-btn" onclick="fetchMCQ()">আবার চেষ্টা করুন</button>
+        <button class="btn back-btn" onclick="goHome()">মূল স্ক্রিনে ফিরুন</button>
+    </div>
+
+    <div id="quiz-screen" class="quiz-screen">
+        <h3 id="quiz-title" style="color: #34495e;"></h3>
+        <div id="question" class="question-box">প্রশ্ন লোড হচ্ছে...</div>
+        <div id="options-container"></div>
+        
+        <button id="next-button" class="btn next-btn" onclick="fetchMCQ()" disabled>Next MCQ</button>
+        <button class="btn back-btn" onclick="goHome()">অধ্যায় পরিবর্তন করুন</button>
+    </div>
+</div>
+
+<script>
+    // TODO: আপনার Gemini API Key এখানে বসান
+    const API_KEY = "AQ.Ab8RN6L5V2fwDEaWy6PqgeC5b02XldkOM-nzTe2a7hjRvWzH-Q"; 
+    
+    let currentChapter = 1;
+    let currentChapterTitle = "";
+    let correctAnswer = "";
+    let isAnswered = false;
+
+    // স্ক্রিন পরিবর্তন করার ফাংশন
+    function showScreen(screenId) {
+        document.getElementById('home-screen').style.display = 'none';
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('error-screen').style.display = 'none';
+        
+        document.getElementById(screenId).style.display = 'block';
+    }
+
+    // কুইজ শুরু করার ট্রিগার
+    function startQuiz(chapterNum, chapterTitle) {
+        currentChapter = chapterNum;
+        currentChapterTitle = chapterTitle;
+        document.getElementById('quiz-title').innerText = chapterTitle;
+        fetchMCQ();
+    }
+
+    function goHome() {
+        showScreen('home-screen');
+    }
+
+    // Gemini API থেকে MCQ ডেটা আনা
+    async function fetchMCQ() {
+        showScreen('loading-screen');
+        isAnswered = false;
+        document.getElementById('next-button').disabled = true;
+
+        const prompt = `You are a law professor. Generate 1 multiple-choice question (MCQ) in Bengali from Chapter ${currentChapter} of the Penal Code 1860. The output must be strictly in JSON format with the following keys: "question", "options" (an array of 4 choices), and "correct_answer" (must match one of the options exactly). Do not include any markdown formatting, markdown blocks like \`\`\`json, or extra text.`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            const data = await response.json();
+            let rawText = data.candidates[0].content.parts[0].text;
+            
+            // যদি Gemini কোনো কারণে ব্যাকটিক (```json) কোড ব্লক দেয়, তা পরিষ্কার করা
+            rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+            
+            const mcqData = JSON.parse(rawText);
+            
+            displayQuiz(mcqData);
+        } catch (error) {
+            console.error(error);
+            document.getElementById('error-message').innerText = error.message;
+            showScreen('error-screen');
+        }
+    }
+
+    // স্ক্রিনে প্রশ্ন ও অপশন দেখানো
+    function displayQuiz(data) {
+        showScreen('quiz-screen');
+        document.getElementById('question').innerText = data.question;
+        correctAnswer = data.correct_answer;
+        
+        const optionsContainer = document.getElementById('options-container');
+        optionsContainer.innerHTML = ""; // আগের অপশন মুছে ফেলা
+
+        data.options.forEach(option => {
+            const button = document.createElement('button');
+            button.className = 'btn';
+            button.innerText = option;
+            button.onclick = () => checkAnswer(button, option);
+            optionsContainer.appendChild(button);
+        });
+    }
+
+    // উত্তর সঠিক না ভুল তা যাচাই করা
+    function checkAnswer(selectedButton, selectedOption) {
+        if (isAnswered) return; // একবার উত্তর দিলে আর ক্লিক করা যাবে না
+        isAnswered = true;
+
+        const buttons = document.getElementById('options-container').getElementsByTagName('button');
+        
+        for (let button of buttons) {
+            button.disabled = true; // সব বাটন লক করা
+            if (button.innerText === correctAnswer) {
+                button.classList.add('correct'); // সঠিক উত্তর সবুজ হবে
+            }
+        }
+
+        if (selectedOption !== correctAnswer) {
+            selectedButton.classList.add('wrong'); // ভুল উত্তর দিলে লাল হবে
+        }
+
+        // নেক্সট বাটন সচল করা
+        document.getElementById('next-button').disabled = false;
+    }
+</script>
+
+</body>
+</html>
